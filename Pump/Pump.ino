@@ -224,7 +224,7 @@ void Encoder::tick() {
 #define CLK 4
 #define DT 3
 #define SW 2
-Encoder enc1(CLK, DT, SW);
+Encoder enc(CLK, DT, SW);
 
 //////////////////////////////////////////Настройки дисплея
 //#include "LCD_1602_RUS.h"
@@ -273,10 +273,13 @@ pinMode(8, OUTPUT);digitalWrite(8, !SWITCH_LEVEL);
 pinMode(9, OUTPUT);digitalWrite(9, !SWITCH_LEVEL);
     
 //////////////////////////////////////////Включение энкодера
-enc1.setStepNorm(1);
+enc.setStepNorm(1);
 attachInterrupt(0, encISR, CHANGE);
-enc1.setType(ENCODER_TYPE);
-
+enc.setType(ENCODER_TYPE);
+enc.setCounters(1, 1);  //Установка начальных переменных
+enc.setSteps(1, 1);     //Установка шага
+enc.setLimitsNorm(0, 10);//Установка пределов  
+enc.setLimitsHold(0, 10);//Установка пределов  
 
 //////////////////////////////////////////НАСТРОЙКИ
   if (PERIOD) period_coef = (long)1000 * (long)60 * 60;  // перевод в часы
@@ -321,12 +324,16 @@ enc1.setType(ENCODER_TYPE);
   // ---------------------- ВЫВОД НА ДИСПЛЕЙ ------------------------
   // вывести буквенные подписи
 //  lcd.setCursor(1, 0);
-//  //lcd.print("Pump #");
+//  lcd.print("Pump #");
+Serial.print("Pump #");
 //  lcd.print(relayNames[0]);
+Serial.println("Kitchen");
 //  lcd.setCursor(1, 1);
 //  lcd.print("Prd: ");
+Serial.print("Prd: ");
 //  lcd.setCursor(10, 1);
 //  lcd.print("t");
+Serial.println("t");
 //  lcd.print(": ");
 
 //  arrow_update = true;        // флаг на обновление стрелочки
@@ -334,11 +341,57 @@ enc1.setType(ENCODER_TYPE);
 //  reDraw();                   // вывести на дисплей (флаг стрелок сбросился, выведем числа...)
 }
 
+byte mode = 0;// 0 - Режим поливайки , 1 - режим радио , 2 - режим ещё чего-то...
 void loop() {
   encoderTick();
   periodTick();
   flowTick();
 }
+
+void encoderTick() {
+  enc.tick();      // отработка энкодера
+  if (enc.isTurn()) {             // если был совершён поворот
+    Serial.print(enc.normCount);  // получить счётчик обычный
+    Serial.print(" ");
+    Serial.println(enc.holdCount); // получить счётчик при нажатой кнопке
+  }
+  if (enc.isRight()) Serial.println("Right");         // если был поворот
+  if (enc.isLeft()) Serial.println("Left");
+  if (enc.isRightH()) Serial.println("Right holded"); // если было удержание + поворот
+  if (enc.isLeftH()) Serial.println("Left holded");
+  if (enc.isPress()) Serial.println("Press");         // нажатие на кнопку (+ дебаунс)
+  
+  if (enc.isRelease())
+  {
+    Serial.println("Sleep out!");     //Выход из режима сна
+    reDraw();                         //Обновить дисплей
+  }
+  
+  if (enc.isHolded()) Serial.println("Holded");       // если была удержана и энк не поворачивался
+
+  
+
+//  if (enc.isRelease()) {       // если был нажат
+//    arrow_update = true;        // флаг на обновление стрелочки
+//    reDraw();                   // обновить дисплей
+//  }
+
+//  if (enc.isTurn()) {                               // если был совершён поворот
+//    switch (current_set) {                           // смотрим, какая опция сейчас меняется
+//      case 0:                                        // если номер помпы
+//        current_pump = enc.normCount;               // получить значение с энкодера
+//        break;
+//      case 1:                                        // если период работы помпы
+//        period_time[current_pump] = enc.normCount;  // получить значение с энкодера
+//        break;
+//      case 2:                                        // если время работы помпы
+//        pumping_time[current_pump] = enc.normCount; // получить значение с энкодера
+//        break;
+//    }
+//    reDraw();                                        // обновить дисплей
+//  }
+}
+
 
 void periodTick() {
 //  for (byte i = 0; i < PUPM_AMOUNT; i++) {            // пробегаем по всем помпам
@@ -366,34 +419,7 @@ void flowTick() {
 }
 
 void encISR() {
-  enc1.tick();                  // отработка энкодера
-}
-void encoderTick() {
-  enc1.tick();                  // отработка энкодера
-  if(enc1.isTurn())
-  {
-    Serial.println("turn");
-  }
-
-//  if (enc1.isRelease()) {       // если был нажат
-//    arrow_update = true;        // флаг на обновление стрелочки
-//    reDraw();                   // обновить дисплей
-//  }
-
-//  if (enc1.isTurn()) {                               // если был совершён поворот
-//    switch (current_set) {                           // смотрим, какая опция сейчас меняется
-//      case 0:                                        // если номер помпы
-//        current_pump = enc1.normCount;               // получить значение с энкодера
-//        break;
-//      case 1:                                        // если период работы помпы
-//        period_time[current_pump] = enc1.normCount;  // получить значение с энкодера
-//        break;
-//      case 2:                                        // если время работы помпы
-//        pumping_time[current_pump] = enc1.normCount; // получить значение с энкодера
-//        break;
-//    }
-//    reDraw();                                        // обновить дисплей
-//  }
+  enc.tick();                  // отработка энкодера
 }
 
 void reDraw() {
@@ -403,19 +429,19 @@ void reDraw() {
 //    if (current_set == 0) update_EEPROM();       // если переключилиссь на выбор помпы, обновить данные
 //    switch (current_set) {                       // смотрим, какая опция сейчас выбрана
 //      case 0:                                    // если номер помпы
-//        enc1.setCounterNorm(current_pump);       // говорим энкодеру работать с номером помпы
-//        enc1.setLimitsNorm(0, PUPM_AMOUNT - 1);  // ограничиваем
+//        enc.setCounterNorm(current_pump);       // говорим энкодеру работать с номером помпы
+//        enc.setLimitsNorm(0, PUPM_AMOUNT - 1);  // ограничиваем
 //        // стереть предыдущую стрелочку и нарисовать новую
 //        lcd.setCursor(0, 0); lcd.write(126); lcd.setCursor(9, 1); lcd.print(" ");
 //        break;
 //      case 1:
-//        enc1.setCounterNorm(period_time[current_pump]);
-//        enc1.setLimitsNorm(1, 99);
+//        enc.setCounterNorm(period_time[current_pump]);
+//        enc.setLimitsNorm(1, 99);
 //        lcd.setCursor(0, 1); lcd.write(126); lcd.setCursor(0, 0); lcd.print(" ");
 //        break;
 //      case 2:
-//        enc1.setCounterNorm(pumping_time[current_pump]);
-//        enc1.setLimitsNorm(1, 99);
+//        enc.setCounterNorm(pumping_time[current_pump]);
+//        enc.setLimitsNorm(1, 99);
 //        lcd.setCursor(9, 1); lcd.write(126); lcd.setCursor(0, 1); lcd.print(" ");
 //        break;
 //    }
