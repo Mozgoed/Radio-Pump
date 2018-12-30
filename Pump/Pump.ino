@@ -363,8 +363,18 @@ void encoderTick() {
   }
   if (enc.isRight()) Serial.println("Right");         // если был поворот
   if (enc.isLeft()) Serial.println("Left");
-  if (enc.isRightH()) Serial.println("Right holded"); // если было удержание + поворот
-  if (enc.isLeftH()) Serial.println("Left holded");
+  if (enc.isRightH())               // если было удержание + поворот
+  {
+    mode = 1;
+    page = 0;
+    draw();
+  }
+  if (enc.isLeftH())
+  {
+    mode = 0;
+    page = 0;
+    draw();
+  }
   if (enc.isPress())
   {
     sleep = false;
@@ -373,12 +383,18 @@ void encoderTick() {
 
   if (enc.isRelease())
   {
-    Serial.println("Sleep out!");     //Выход из режима сна
-    //    lcd.setCursor(1, 0);
-    //    lcd.print("Pump #");                       //Обновить дисплей
+    if(mode == 0)
+    {
+        page = page >= 1 ? 0 : page + 1;
+        Serial.println("page "+String(page));
+        draw();
+    }
   }
 
-  if (enc.isHolded()) Serial.println("Holded");       // если была удержана и энк не поворачивался
+  if (enc.isHolded()) //Долгое удержание СОХРАНЯЕТ НАСТРОЙКИ
+  {
+    update_EEPROM();
+  }
 
 
 
@@ -449,16 +465,33 @@ void draw() {
     if (page == 1)
     {
       lcd.home();
+      lcd.print("Room : Kitchen");
+      lcd.setCursor(0,1);
+      lcd.print("> Period : ");
+      if(modePump) lcd.print("ON"); else lcd.print("OFF");
+    }
+  }
+
+  if (mode == 1)
+  {
+    if (page == 0)
+    {
+      lcd.home();
+      lcd.print("* Mode : Radio *");
+      lcd.setCursor(0,1);
+      lcd.print("> Work : ");
+      if(modeRadio) lcd.print("ON"); else lcd.print("OFF");
+    }
+    if (page == 1)
+    {
+      lcd.home();
       lcd.print("* Mode : Pump *");
       lcd.setCursor(0,1);
       lcd.print("> Work : ");
       if(modePump) lcd.print("ON"); else lcd.print("OFF");
     }
   }
-  //  if (arrow_update) {                            // если изменился режим выбора
-  //    if (++current_set > 2)                       // менять current_set в пределах 0.. 2
-  //      current_set = 0;
-  //    if (current_set == 0) update_EEPROM();       // если переключилиссь на выбор помпы, обновить данные
+  
   //    switch (current_set) {                       // смотрим, какая опция сейчас выбрана
   //      case 0:                                    // если номер помпы
   //        enc.setCounterNorm(current_pump);       // говорим энкодеру работать с номером помпы
